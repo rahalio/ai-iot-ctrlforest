@@ -1,0 +1,361 @@
+openapi: 3.0.3
+info:
+  title: CtrlForest
+  version: 0.1.0
+  description: >-
+    Two-stage SD-IoT intrusion detection with swarm feature selection and weight-adapted Random Forest.
+  x-product-slug: ai-iot-ctrlforest
+  x-source: ai-in-iot/1806.02566v1/
+servers:
+  - url: https://api.example.com
+tags:
+  - name: Domains
+  - name: FeatureSets
+  - name: Models
+  - name: Alerts
+  - name: Mitigations
+paths:
+  /v1/domains:
+    get:
+      operationId: listDomains
+      tags: [Domains]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Domains
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeControllerDomain" }
+    post:
+      operationId: registerDomain
+      tags: [Domains]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ControllerDomain" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeControllerDomain" }
+  /v1/feature-sets:
+    get:
+      operationId: listFeatureSets
+      tags: [FeatureSets]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Feature sets
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeFeatureSet" }
+    post:
+      operationId: runFeatureSelection
+      tags: [FeatureSets]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domainId]
+              properties:
+                domainId: { type: string }
+      responses:
+        "202":
+          description: Selection started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeFeatureSet" }
+  /v1/models:
+    get:
+      operationId: listModels
+      tags: [Models]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Models
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeForestModel" }
+    post:
+      operationId: trainForestModel
+      tags: [Models]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domainId, featureSetId]
+              properties:
+                domainId: { type: string }
+                featureSetId: { type: string }
+      responses:
+        "202":
+          description: Training accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeForestModel" }
+  /v1/models/{modelId}/promote:
+    parameters: [{ name: modelId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: promoteForestModel
+      tags: [Models]
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200":
+          description: Promoted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeForestModel" }
+  /v1/alerts:
+    get:
+      operationId: listAlerts
+      tags: [Alerts]
+      security: [{ BearerAuth: [] }, { ApiKeyAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+        - name: domainId
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeDetectionAlert" }
+  /v1/alerts/{alertId}/disposition:
+    parameters: [{ name: alertId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: disposeAlert
+      tags: [Alerts]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disposition]
+              properties:
+                disposition: { type: string, enum: [true_positive, false_positive, false_negative] }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeDetectionAlert" }
+  /v1/mitigations:
+    post:
+      operationId: createMitigation
+      tags: [Mitigations]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MitigationAction" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelopeMitigationAction" }
+    get:
+      operationId: listMitigations
+      tags: [Mitigations]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/Cursor" }, { $ref: "#/components/parameters/Limit" }]
+      responses:
+        "200":
+          description: Mitigations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListEnvelopeMitigationAction" }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+  schemas:
+    ResponseMeta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    ControllerDomain:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        mitigationEnabled: { type: boolean }
+        fprCeiling: { type: number, format: float }
+    FeatureSet:
+      type: object
+      required: [id, domainId, status]
+      properties:
+        id: { type: string }
+        domainId: { type: string }
+        featureNames: { type: array, items: { type: string } }
+        fitness: { type: number, format: float }
+        status: { type: string, enum: [running, ready, frozen, failed] }
+    ForestModel:
+      type: object
+      required: [id, domainId, featureSetId, status]
+      properties:
+        id: { type: string }
+        domainId: { type: string }
+        featureSetId: { type: string }
+        status: { type: string, enum: [training, ready, promoted, retired, failed] }
+        precision: { type: number, format: float }
+        recall: { type: number, format: float }
+        fpr: { type: number, format: float }
+    DetectionAlert:
+      type: object
+      required: [id, domainId, attackClass, confidence]
+      properties:
+        id: { type: string }
+        domainId: { type: string }
+        attackClass: { type: string, enum: [Normal, Probe, DoS, U2R, R2L] }
+        confidence: { type: number, format: float }
+        contributingFeatures: { type: array, items: { type: string } }
+        disposition: { type: string, enum: [open, true_positive, false_positive, false_negative] }
+    MitigationAction:
+      type: object
+      required: [id, alertId, action]
+      properties:
+        id: { type: string }
+        alertId: { type: string }
+        action: { type: string, enum: [alert_only, quarantine_flow, redirect] }
+        status: { type: string, enum: [requested, applied, denied, rolled_back] }
+    DataEnvelopeControllerDomain:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/ControllerDomain" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeControllerDomain:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ControllerDomain" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeFeatureSet:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/FeatureSet" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeFeatureSet:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/FeatureSet" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeForestModel:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/ForestModel" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeForestModel:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ForestModel" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeDetectionAlert:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/DetectionAlert" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeDetectionAlert:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/DetectionAlert" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    DataEnvelopeMitigationAction:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: "#/components/schemas/MitigationAction" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ListEnvelopeMitigationAction:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MitigationAction" }
+            nextCursor: { type: string }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
